@@ -1,0 +1,4 @@
+scapy>=2.5.0
+NetfilterQueue>=1.1.0
+rich>=13.0.0
+Flask>=3.0.0

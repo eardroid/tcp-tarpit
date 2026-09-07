@@ -14,6 +14,7 @@ from config import (
     NORMAL_CLOSE_DELAY,
     STATE_TIMEOUT,
     SYNACK_PER_MINUTE,
+    TARPIT_WINDOW,
     TRAP_PORTS,
     TTL_PROFILES,
 )
@@ -27,13 +28,23 @@ class PacketHandler:
         self.states = {}
         self.lock = threading.Lock()
         self.synack_hits = {}
+        self.ttl_cache = {}
 
     def _key(self, ip_packet, tcp_packet):
         return (ip_packet.src, tcp_packet.sport, tcp_packet.dport)
 
-    def _spoof(self):
+    def _spoof(self, client_ip):
+        # one fake os per source ip. picking randomly per connection looks
+        # fake the moment a scanner compares TTLs across two ports.
+        cached = self.ttl_cache.get(client_ip)
+        if cached is not None:
+            return cached
+        if len(self.ttl_cache) >= MAX_TRACKED_IPS:
+            self.ttl_cache.pop(next(iter(self.ttl_cache)), None)
         name = random.choice(list(TTL_PROFILES))
-        return name, TTL_PROFILES[name]
+        profile = (name, TTL_PROFILES[name])
+        self.ttl_cache[client_ip] = profile
+        return profile
 
     def _send(self, state, flags, sequence, acknowledgement, window, data=b""):
         reply = (
@@ -74,7 +85,7 @@ class PacketHandler:
         return True
 
     def _send_synack(self, state):
-        window = 0 if state["classification"] == "scanner" else 64240
+        window = TARPIT_WINDOW if state["classification"] == "scanner" else 64240
         self._send(state, "SA", state["server_sequence"], state["client_sequence"], window)
 
     def _close_normal_later(self, key, state, client_sequence):
@@ -105,14 +116,14 @@ class PacketHandler:
             sequence = state["next_server_sequence"]
             acknowledgement = state["client_acknowledgement"]
             state["next_server_sequence"] += len(byte)
-        self._send(state, "PA", sequence, acknowledgement, 0, byte)
+        self._send(state, "PA", sequence, acknowledgement, TARPIT_WINDOW, byte)
 
     def dribble_finished(self, connection_id):
         self.database.set_status(connection_id, "released")
 
     def _new_connection(self, ip_packet, tcp_packet):
         classification, hit_count = self.detector.check(ip_packet.src, tcp_packet.dport)
-        spoofed_os, spoofed_ttl = self._spoof()
+        spoofed_os, spoofed_ttl = self._spoof(ip_packet.src)
         status = "trapped" if classification == "scanner" else "normal"
         connection_id = self.database.add_connection(
             ip_packet.src, tcp_packet.dport, tcp_packet.sport, ip_packet.ttl,

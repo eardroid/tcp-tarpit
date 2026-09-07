@@ -30,6 +30,10 @@ MAX_DRIBBLES = 64       # max slow-drip threads at once
 SYNACK_PER_MINUTE = 20  # max SYN-ACK replies per source ip per minute
 MAX_TRACKED_IPS = 4096  # max source ips remembered across detector + handler
 
+# small but nonzero: window 0 makes scanners read us as filtered and
+# some stacks wont accept data bytes on a zero window at all.
+TARPIT_WINDOW = 128
+
 # Cisco and BSD both normally use an initial TTL of 255.
 TTL_PROFILES = {
     "Windows": 128,

@@ -3,6 +3,7 @@ import argparse
 import logging
 import os
 import platform
+import signal
 import threading
 from pathlib import Path
 
@@ -67,6 +68,9 @@ def main():
     rules = Iptables(args.queue)
     queue = NetfilterQueue()
     stop_event = threading.Event()
+    # systemd sends SIGTERM on stop, not Ctrl+C. without this the finally
+    # below never runs and our iptables rules stay behind.
+    signal.signal(signal.SIGTERM, lambda *args: stop_event.set())
     web = None
     queue_thread = None
 

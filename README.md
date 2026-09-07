@@ -65,6 +65,7 @@ Local tests that do not need root:
 python3 tests/test_normal_user.py
 python3 tests/test_scanner.py
 python3 tests/test_database.py
+python3 tests/test_safety.py
 ```
 
 Network tests need a separate scanner host:

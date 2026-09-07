@@ -51,7 +51,7 @@ Or use the helper script:
 sudo bash run.sh
 ```
 
-The terminal dashboard starts by default. The web dashboard listens on `http://0.0.0.0:5000`.
+The terminal dashboard starts by default. The web dashboard listens on `http://127.0.0.1:5000` (pass `--web-host 0.0.0.0` to expose it on the LAN).
 
 Stop it with `Ctrl+C`, or from another shell:
 

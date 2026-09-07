@@ -188,9 +188,11 @@ class PacketHandler:
                 if state and flags & (0x01 | 0x04):  # FIN or RST
                     self.release(key, state)
                 elif state and flags & 0x10:  # ACK
-                    # ack number lives in the ack field, not seq. seq is where
-                    # the client is sending from, ack is what it got from us.
-                    state["client_acknowledgement"] = int(tcp_packet.ack)
+                    # our next segment's ack number must echo what the client
+                    # sent us, i.e. its seq. (their ack field holds OUR seq,
+                    # which is our business, not theirs. verified live: using
+                    # tcp.ack here makes the client silently drop our bytes.)
+                    state["client_acknowledgement"] = int(tcp_packet.seq)
                     if state["classification"] == "scanner" and not state["dribble_started"]:
                         if self.dribbler.active_count() < MAX_DRIBBLES:
                             state["dribble_started"] = True

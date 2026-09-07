@@ -2,7 +2,7 @@ import threading
 import time
 from collections import defaultdict, deque
 
-from config import HIT_THRESHOLD, HIT_WINDOW
+from config import HIT_THRESHOLD, HIT_WINDOW, MAX_TRACKED_IPS
 
 
 class ScannerDetector:
@@ -12,11 +12,25 @@ class ScannerDetector:
         self.hits = defaultdict(deque)
         self.lock = threading.Lock()
 
+    def _make_room(self, now):
+        # expire quiet ips first so one flooder spoofing sources cant
+        # grow this dict forever. arbitrary evict as a last resort.
+        for old_ip in list(self.hits):
+            dq = self.hits[old_ip]
+            while dq and now - dq[0][0] > self.hit_window:
+                dq.popleft()
+            if not dq:
+                del self.hits[old_ip]
+        while len(self.hits) >= MAX_TRACKED_IPS:
+            self.hits.pop(next(iter(self.hits)), None)
+
     def check(self, source_ip, destination_port, now=None):
         if now is None:
             now = time.time()
 
         with self.lock:
+            if source_ip not in self.hits and len(self.hits) >= MAX_TRACKED_IPS:
+                self._make_room(now)
             port_hits = self.hits[source_ip]
             while port_hits and now - port_hits[0][0] > self.hit_window:
                 port_hits.popleft()

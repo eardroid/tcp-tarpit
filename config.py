@@ -23,6 +23,13 @@ WEB_HOST = "0.0.0.0"
 WEB_PORT = 5000
 DEFAULT_DATA_DIR = Path("data")
 
+# safety caps so one flooder cant eat all memory. tweak freely.
+MAX_STATES = 512        # max connections tracked at once, rest ignored
+STATE_TIMEOUT = 120     # forget connections idle longer than this (seconds)
+MAX_DRIBBLES = 64       # max slow-drip threads at once
+SYNACK_PER_MINUTE = 20  # max SYN-ACK replies per source ip per minute
+MAX_TRACKED_IPS = 4096  # max source ips remembered across detector + handler
+
 # Cisco and BSD both normally use an initial TTL of 255.
 TTL_PROFILES = {
     "Windows": 128,

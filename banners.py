@@ -13,4 +13,5 @@ BANNERS = {
 
 
 def get_banner(port):
-    return BANNERS[port]
+    # trap ports and banner ports can drift apart, so never blow up here.
+    return BANNERS.get(port, b"220 fake service ready\r\n")

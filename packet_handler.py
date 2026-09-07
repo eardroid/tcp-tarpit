@@ -39,12 +39,28 @@ class PacketHandler:
         window = 0 if state["classification"] == "scanner" else 64240
         self._send(state, "SA", state["server_sequence"], state["client_sequence"], window)
 
-    def _send_clean_close(self, state, client_sequence):
-        time.sleep(NORMAL_CLOSE_DELAY)
-        self._send(
-            state, "FA", state["server_sequence"] + 1, client_sequence, 64240,
-            state["banner"],
-        )
+    def _close_normal_later(self, key, state, client_sequence):
+        # normal conns get one banner + FIN and then we forget them. the
+        # small delay happens in a background thread so waiting here never
+        # blocks other packets coming in on the queue thread.
+        def work():
+            time.sleep(NORMAL_CLOSE_DELAY)
+            try:
+                self._send(
+                    state, "FA", state["server_sequence"] + 1, client_sequence, 64240,
+                    state["banner"],
+                )
+            except Exception:
+                logging.exception("clean close send failed")
+            try:
+                self.database.set_status(state["id"], "closed")
+            except Exception:
+                logging.exception("clean close db update failed")
+            with self.lock:
+                if self.states.get(key) is state:
+                    self.states.pop(key, None)
+
+        threading.Thread(target=work, name=f"close-{state['id']}", daemon=True).start()
 
     def send_dribble_byte(self, state, byte):
         with self.lock:
@@ -79,6 +95,7 @@ class PacketHandler:
             "classification": classification,
             "banner": get_banner(tcp_packet.dport),
             "dribble_started": False,
+            "closing": False,
         }
         state["next_server_sequence"] = state["server_sequence"] + 1
         logging.info(
@@ -115,11 +132,9 @@ class PacketHandler:
                     if state["classification"] == "scanner" and not state["dribble_started"]:
                         state["dribble_started"] = True
                         self.dribbler.start(state)
-                    elif state["classification"] == "normal":
-                        self._send_clean_close(state, int(tcp_packet.seq))
-                        self.database.set_status(state["id"], "closed")
-                        with self.lock:
-                            self.states.pop(key, None)
+                    elif state["classification"] == "normal" and not state.get("closing"):
+                        state["closing"] = True
+                        self._close_normal_later(key, state, int(tcp_packet.seq))
 
             # Dropping prevents the host TCP stack from sending its own RST packets.
             queued_packet.drop()

@@ -109,7 +109,9 @@ class PacketHandler:
                 if state and flags & (0x01 | 0x04):  # FIN or RST
                     self.release(key, state)
                 elif state and flags & 0x10:  # ACK
-                    state["client_acknowledgement"] = int(tcp_packet.seq)
+                    # ack number lives in the ack field, not seq. seq is where
+                    # the client is sending from, ack is what it got from us.
+                    state["client_acknowledgement"] = int(tcp_packet.ack)
                     if state["classification"] == "scanner" and not state["dribble_started"]:
                         state["dribble_started"] = True
                         self.dribbler.start(state)

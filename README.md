@@ -90,12 +90,12 @@ The default trap ports and timing values are in `config.py`.
 
 ## Known Limitations
 
-- Linux only.
-- IPv4 TCP only.
+- Linux only, needs a real kernel (WSL2 has no NFQUEUE support).
+- IPv4 TCP only, so on dual-stack hosts scans over IPv6 walk straight past it.
+- Only full-connect scans get stuck. SYN-only scanners just get one SYN-ACK each and move on.
 - Do not run real services on the trap ports.
-- SYN scans and connect scans behave differently depending on where the scanner runs.
-- This is a lab project, not a replacement for a firewall or IDS.
+- This is a lab project, not a replacement for a firewall or IDS. Run it on an isolated box you control.
 
 ## License
 
-No license has been added yet.
+MIT, see LICENSE.

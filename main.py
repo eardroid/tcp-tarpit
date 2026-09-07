@@ -39,7 +39,7 @@ def set_up_logging(data_dir):
 
 def check_linux_root():
     if platform.system() != "Linux":
-        raise SystemExit("This project is Linux-only. Run it on Ubuntu, Debian, Kali, or WSL2.")
+        raise SystemExit("This project is Linux-only with a real kernel (WSL2 wont do, no NFQUEUE there).")
     if os.geteuid() != 0:
         raise SystemExit("Run with sudo so iptables, NFQUEUE, and Scapy raw packets can work.")
 

@@ -59,6 +59,14 @@ Stop it with `Ctrl+C`, or from another shell:
 sudo bash stop.sh
 ```
 
+## Demo
+
+A short clip showing the tarpit project in operation is included here:
+
+[Watch the TCP tarpit demo](demo/tcp-tarpit-demo.mp4)
+
+The clip is a quick project demonstration rather than a benchmark or a security validation report. Run the software only in a Linux lab environment that you control.
+
 Local tests that do not need root:
 
 ```bash

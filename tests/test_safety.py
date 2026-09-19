@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# packet_handler needs scapy at import time, so give it a tiny fake.
 fake_scapy = types.ModuleType("scapy")
 fake_all = types.ModuleType("scapy.all")
 
@@ -108,17 +107,14 @@ def syn(src, sport, dport):
     return Queued(FakeIP(tcp=FakeTCP(sport=sport, dport=dport)))
 
 
-# 1. unknown ports get a generic banner instead of raising KeyError.
 assert get_banner(9999) == b"220 fake service ready\r\n"
 assert get_banner(22).startswith(b"SSH-2.0")
 
-# 2. non-trap traffic is accepted, never stored.
 h = PacketHandler(FakeDB(), ScannerDetector(), FakeDribble())
 q = Queued(FakeIP(tcp=FakeTCP(dport=9999)))
 h.process_packet(q)
 assert q.accepted and not q.dropped and len(h.states) == 0
 
-# 3. state cap: only MAX_STATES tracked, the rest stay silent.
 ph.MAX_STATES = 2
 h = PacketHandler(FakeDB(), ScannerDetector(), FakeDribble())
 n0 = len(sent)
@@ -131,7 +127,6 @@ assert len(h.states) == 2
 assert q3.dropped and ("192.0.2.9", 40003, 22) not in h.states
 ph.MAX_STATES = 512
 
-# 4. per-ip SYN-ACK rate limit kicks in.
 ph.SYNACK_PER_MINUTE = 2
 h = PacketHandler(FakeDB(), ScannerDetector(), FakeDribble())
 a, b, c = syn("192.0.2.77", 41001, 22), syn("192.0.2.77", 41002, 22), syn("192.0.2.77", 41003, 22)
@@ -141,7 +136,6 @@ h.process_packet(c)
 assert c.dropped and len(h.states) == 2
 ph.SYNACK_PER_MINUTE = 20
 
-# 5. idle states get pruned so the dict cant grow forever.
 h = PacketHandler(FakeDB(), ScannerDetector(), FakeDribble())
 h.process_packet(syn("192.0.2.9", 42001, 22))
 assert len(h.states) == 1
@@ -150,13 +144,11 @@ h.states[key]["last_seen"] = 5000.0
 h._prune_states(5000.0 + 10000)
 assert len(h.states) == 0
 
-# 6. fake ttl is steady per ip (comparing two ports must not change it).
 h = PacketHandler(FakeDB(), ScannerDetector(), FakeDribble())
 first = h._spoof("192.0.2.5")
 h._spoof("192.0.2.6")
 assert h._spoof("192.0.2.5") == first
 
-# 7. detector forgets quiet ips instead of growing without bound.
 d = ScannerDetector()
 base = 1000000.0
 for i in range(MAX_TRACKED_IPS + 50):

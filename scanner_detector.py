@@ -13,8 +13,6 @@ class ScannerDetector:
         self.lock = threading.Lock()
 
     def _make_room(self, now):
-        # expire quiet ips first so one flooder spoofing sources cant
-        # grow this dict forever. arbitrary evict as a last resort.
         for old_ip in list(self.hits):
             dq = self.hits[old_ip]
             while dq and now - dq[0][0] > self.hit_window:

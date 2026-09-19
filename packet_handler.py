@@ -34,8 +34,6 @@ class PacketHandler:
         return (ip_packet.src, tcp_packet.sport, tcp_packet.dport)
 
     def _spoof(self, client_ip):
-        # one fake os per source ip. picking randomly per connection looks
-        # fake the moment a scanner compares TTLs across two ports.
         cached = self.ttl_cache.get(client_ip)
         if cached is not None:
             return cached
@@ -58,15 +56,11 @@ class PacketHandler:
         send(reply, verbose=False)
 
     def _prune_states(self, now):
-        # drop connections idle too long. called on every SYN so a slow
-        # leak cant grow this dict forever.
         idle = [k for k, s in self.states.items() if now - s["last_seen"] > STATE_TIMEOUT]
         for k in idle:
             self.states.pop(k, None)
 
     def _synack_allowed(self, ip, now):
-        # per-ip SYN-ACK rate limit. without this, spoofed SYNs turn us
-        # into a reflector and a flood fills the db with junk rows.
         if ip not in self.synack_hits and len(self.synack_hits) >= MAX_TRACKED_IPS:
             for old in list(self.synack_hits):
                 if not self.synack_hits[old]:
@@ -89,9 +83,6 @@ class PacketHandler:
         self._send(state, "SA", state["server_sequence"], state["client_sequence"], window)
 
     def _close_normal_later(self, key, state, client_sequence):
-        # normal conns get one banner + FIN and then we forget them. the
-        # small delay happens in a background thread so waiting here never
-        # blocks other packets coming in on the queue thread.
         def work():
             time.sleep(NORMAL_CLOSE_DELAY)
             try:
@@ -172,8 +163,6 @@ class PacketHandler:
                     full = len(self.states) >= MAX_STATES
                     allowed = self._synack_allowed(packet.src, now)
                 if full or not allowed:
-                    # overloaded or this ip is hammering us: stay silent.
-                    # dropping (not accepting) keeps the host stack quiet too.
                     queued_packet.drop()
                     return
                 state = self._new_connection(packet, tcp_packet)
@@ -188,22 +177,15 @@ class PacketHandler:
                 if state and flags & (0x01 | 0x04):  # FIN or RST
                     self.release(key, state)
                 elif state and flags & 0x10:  # ACK
-                    # our next segment's ack number must echo what the client
-                    # sent us, i.e. its seq. (their ack field holds OUR seq,
-                    # which is our business, not theirs. verified live: using
-                    # tcp.ack here makes the client silently drop our bytes.)
                     state["client_acknowledgement"] = int(tcp_packet.seq)
                     if state["classification"] == "scanner" and not state["dribble_started"]:
                         if self.dribbler.active_count() < MAX_DRIBBLES:
                             state["dribble_started"] = True
                             self.dribbler.start(state)
-                        # else: too many dribbles already, stay quiet and
-                        # retry on the next ACK from this client.
                     elif state["classification"] == "normal" and not state.get("closing"):
                         state["closing"] = True
                         self._close_normal_later(key, state, int(tcp_packet.seq))
 
-            # Dropping prevents the host TCP stack from sending its own RST packets.
             queued_packet.drop()
         except Exception:
             logging.exception("packet callback error")

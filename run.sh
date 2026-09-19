@@ -1,6 +1,4 @@
 #!/bin/bash
-# Start the TCP tarpit. Needs root (iptables + NFQUEUE + raw sockets).
-# Run inside the Linux host (Ubuntu/Debian/Kali/WSL2):  bash run.sh
 set -euo pipefail
 
 cd "$(dirname "$0")"
